@@ -8,10 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SynchronousSink;
 
 import java.math.BigDecimal;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 @Service @Transactional
@@ -31,11 +29,11 @@ public class BankService {
 
         // https://stackoverflow.com/a/53596358 : validasi mono
         Mono<Rekening> rekeningAsalUpdated = rekeningDao.findByNomor(asal)
-                .handle(validasiRekening(nilai))
+                .flatMap(validasiRekening(asal, tujuan, nilai))
                 .flatMap(updateSaldoRekening(nilai.negate()));
 
         Mono<Rekening> rekeningTujuanUpdated = rekeningDao.findByNomor(tujuan)
-                .handle(validasiRekening(nilai))
+                .flatMap(validasiRekening(asal, tujuan, nilai))
                 .flatMap(updateSaldoRekening(nilai));
 
         Mono<LogTransaksi> logSukses = logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
@@ -54,6 +52,28 @@ public class BankService {
                 .flatMap(mutasiDao::save).last().then(logSukses).then();
     }
 
+    private Function<Rekening, Mono<? extends Rekening>> validasiRekening(String asal, String tujuan, BigDecimal nilai) {
+        return r -> {
+            Boolean error = false;
+            String errorMessage = null;
+
+            if(saldoKurang(r, nilai)) {
+                error = true;
+                errorMessage = "Saldo tidak cukup";
+            } else if(!r.getAktif()) {
+                error = true;
+                errorMessage = "Rekening tidak aktif";
+            }
+
+            if(error) {
+                return logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
+                                keteranganLogTransaksi(asal, tujuan, nilai) +" - ["+errorMessage+"]")
+                        .then(Mono.error(new IllegalStateException(errorMessage)));
+            }
+            return Mono.just(r);
+        };
+    }
+
     private String keteranganLogTransaksi(String asal, String tujuan, BigDecimal nilai) {
         return "Transfer "+asal+" -> "+tujuan+ " ["+nilai+"]";
     }
@@ -65,17 +85,7 @@ public class BankService {
         };
     }
 
-    private BiConsumer<Rekening, SynchronousSink<Rekening>> validasiRekening(BigDecimal nilai) {
-        return (r, sink) -> {
-            if(saldoKurang(r, nilai)) {
-                sink.error(new IllegalStateException("Saldo tidak cukup"));
-            } else if(!r.getAktif()) {
-                sink.error(new IllegalArgumentException("Rekening tidak aktif"));
-            } else {
-                sink.next(r);
-            }
-        };
-    }
+
 
     private boolean saldoKurang(Rekening rekeningAsal, BigDecimal nilai) {
         return nilai.compareTo(rekeningAsal.getSaldo()) > 0;

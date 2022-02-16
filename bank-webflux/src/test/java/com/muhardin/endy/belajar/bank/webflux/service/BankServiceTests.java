@@ -35,4 +35,16 @@ public class BankServiceTests {
     public void testTransferSukses() {
         bankService.transfer("N-001", "N-002", new BigDecimal(25000)).block();
     }
+
+    @Test
+    public void testTransferRekeningTidakAktif() {
+        // gagal rollback berikut lognya
+        bankService.transfer("N-001", "N-003", new BigDecimal(25000)).block();
+    }
+
+    @Test
+    public void testTransferSaldoKurang() {
+        // ini rollback berikut lognya
+        bankService.transfer("N-001", "N-002", new BigDecimal(25000000)).block();
+    }
 }
