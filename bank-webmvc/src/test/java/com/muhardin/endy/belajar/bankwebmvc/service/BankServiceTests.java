@@ -13,7 +13,17 @@ public class BankServiceTests {
     @Autowired private BankService bankService;
 
     @Test
-    public void testTransfer() {
+    public void testTransferSukses() {
         bankService.transfer("N-001", "N-002", new BigDecimal(25000));
+    }
+
+    @Test
+    public void testTransferRekeningTidakAktif() {
+        bankService.transfer("N-001", "N-003", new BigDecimal(25000));
+    }
+
+    @Test
+    public void testTransferSaldoKurang() {
+        bankService.transfer("N-001", "N-002", new BigDecimal(25000000));
     }
 }
