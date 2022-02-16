@@ -2,18 +2,13 @@ package com.muhardin.endy.belajar.bank.webflux.service;
 
 import com.muhardin.endy.belajar.bank.webflux.dao.MutasiDao;
 import com.muhardin.endy.belajar.bank.webflux.dao.RekeningDao;
-import com.muhardin.endy.belajar.bank.webflux.entity.JenisTransaksi;
-import com.muhardin.endy.belajar.bank.webflux.entity.Mutasi;
-import com.muhardin.endy.belajar.bank.webflux.entity.Rekening;
+import com.muhardin.endy.belajar.bank.webflux.entity.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SynchronousSink;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuple3;
-import reactor.util.function.Tuples;
 
 import java.math.BigDecimal;
 import java.util.function.BiConsumer;
@@ -25,10 +20,14 @@ public class BankService {
     @Autowired private RekeningDao rekeningDao;
     @Autowired private MutasiDao mutasiDao;
     @Autowired private RunningNumberService runningNumberService;
+    @Autowired private LogTransaksiService logTransaksiService;
 
     public Mono<Void> transfer(String asal, String tujuan, BigDecimal nilai){
-        Mono<String> referensi = runningNumberService.ambilNomor(JenisTransaksi.TRANSFER)
-                .map(nomor -> JenisTransaksi.TRANSFER.name() + "-" + String.format("%05d",nomor));
+        Mono<LogTransaksi> logMulai = logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.MULAI,
+                keteranganLogTransaksi(asal, tujuan, nilai));
+
+        Mono<String> referensi = logMulai.then(runningNumberService.ambilNomor(JenisTransaksi.TRANSFER)
+                .map(nomor -> JenisTransaksi.TRANSFER.name() + "-" + String.format("%05d",nomor)));
 
         // https://stackoverflow.com/a/53596358 : validasi mono
         Mono<Rekening> rekeningAsalUpdated = rekeningDao.findByNomor(asal)
@@ -39,6 +38,9 @@ public class BankService {
                 .handle(validasiRekening(nilai))
                 .flatMap(updateSaldoRekening(nilai));
 
+        Mono<LogTransaksi> logSukses = logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
+                keteranganLogTransaksi(asal, tujuan, nilai));
+
         return Mono.zip(rekeningAsalUpdated, rekeningTujuanUpdated, referensi)
                 .flatMapMany(tuple3 -> {
                     Rekening src = tuple3.getT1();
@@ -48,7 +50,12 @@ public class BankService {
                     return Flux.concat(
                             simpanMutasi(src, keterangan, nilai.negate(), ref),
                             simpanMutasi(dst, keterangan, nilai, ref));
-                }).flatMap(mutasiDao::save).then();
+                })
+                .flatMap(mutasiDao::save).last().then(logSukses).then();
+    }
+
+    private String keteranganLogTransaksi(String asal, String tujuan, BigDecimal nilai) {
+        return "Transfer "+asal+" -> "+tujuan+ " ["+nilai+"]";
     }
 
     private Function<Rekening, Mono<? extends Rekening>> updateSaldoRekening(BigDecimal nilai) {
