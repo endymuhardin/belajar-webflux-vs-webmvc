@@ -24,7 +24,7 @@ public class BankService {
     public void transfer(String asal, String tujuan, BigDecimal nilai){
 
         logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.MULAI,
-                "Transfer "+asal+" -> "+tujuan+ "["+nilai+"]");
+                keteranganLogTransaksi(asal, tujuan, nilai));
 
         String referensi = JenisTransaksi.TRANSFER.name()
                 + "-" + String.format("%05d",
@@ -35,13 +35,13 @@ public class BankService {
 
         if(rekeningTidakAktif(rekeningAsal, rekeningTujuan)) {
             logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
-                    "Transfer "+asal+" -> "+tujuan+ "["+nilai+"] - [REKENING TIDAK AKTIF]");
+                    keteranganLogTransaksi(asal, tujuan, nilai) +" - [REKENING TIDAK AKTIF]");
             throw new IllegalArgumentException("Rekening tidak aktif");
         }
 
         if (saldoKurang(rekeningAsal, nilai)) {
             logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
-                    "Transfer "+asal+" -> "+tujuan+ "["+nilai+"] - [SALDO KURANG]");
+                    keteranganLogTransaksi(asal, tujuan, nilai) +" - [SALDO KURANG]");
             throw new IllegalStateException("Saldo tidak cukup");
         }
 
@@ -49,7 +49,11 @@ public class BankService {
         updateSaldoRekeningTransfer(rekeningAsal, rekeningTujuan, nilai);
 
         logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
-                "Transfer "+asal+" -> "+tujuan+ "["+nilai+"]");
+                keteranganLogTransaksi(asal, tujuan, nilai));
+    }
+
+    private String keteranganLogTransaksi(String asal, String tujuan, BigDecimal nilai) {
+        return "Transfer "+asal+" -> "+tujuan+ " ["+nilai+"]";
     }
 
     private void simpanMutasiTransfer(Rekening rekeningAsal, Rekening rekeningTujuan, BigDecimal nilai, String referensi) {
