@@ -45,8 +45,8 @@ public class BankService {
             throw new IllegalStateException("Saldo tidak cukup");
         }
 
-        simpanMutasiTransfer(rekeningAsal, rekeningTujuan, nilai, referensi);
         updateSaldoRekeningTransfer(rekeningAsal, rekeningTujuan, nilai);
+        simpanMutasiTransfer(rekeningAsal, rekeningTujuan, nilai, referensi);
 
         logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
                 keteranganLogTransaksi(asal, tujuan, nilai));
@@ -74,7 +74,7 @@ public class BankService {
         mutasi.setRekening(rekening);
         mutasi.setJenisTransaksi(JenisTransaksi.TRANSFER);
         mutasi.setKeterangan(keterangan);
-        mutasi.setNilai(nilai.negate());
+        mutasi.setNilai(nilai);
         mutasi.setReferensi(referensi+"-"+rekening.getNomor());
         mutasiDao.save(mutasi);
     }
