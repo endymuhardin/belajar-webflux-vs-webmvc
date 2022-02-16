@@ -14,6 +14,7 @@ public class Mutasi {
 
     @Transient
     private Rekening rekening;
+    private String idRekening;
     private LocalDateTime waktuTransaksi = LocalDateTime.now();
     private BigDecimal nilai;
     private String keterangan;
