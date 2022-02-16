@@ -37,7 +37,8 @@ create table running_number (
 
 create table log_transaksi (
     id varchar(36) DEFAULT gen_random_uuid(),   
-    jenis_aktivitas varchar(100) not null,
+    jenis_transaksi varchar(100) not null,
+    status_aktivitas varchar(100) not null,
     waktu_aktivitas timestamp not null,
     keterangan varchar(255) not null,
     primary key (id)
