@@ -1,0 +1,13 @@
+services:
+  db-virtual-account:
+    container_name: db-bank
+    image: postgres:14
+    environment:
+      - POSTGRES_DB=dbbank
+      - POSTGRES_USER=belajar
+      - POSTGRES_PASSWORD=belajar123
+    ports:
+      - 5432:5432
+    volumes:
+      - ./db-bank:/var/lib/postgresql/data
+      - ./docker_postgres_init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
