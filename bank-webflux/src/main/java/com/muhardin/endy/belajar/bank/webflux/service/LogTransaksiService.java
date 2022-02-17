@@ -9,8 +9,6 @@ import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.ReactiveTransactionManager;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
@@ -35,7 +33,6 @@ public class LogTransaksiService {
         databaseClient = DatabaseClient.create(connectionFactory);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Mono<Void> catat(JenisTransaksi jenisTransaksi, StatusAktivitas statusAktivitas, String keterangan){
         TransactionalOperator rxtx = TransactionalOperator.create(transactionManager);
         return rxtx.execute(txStatus -> databaseClient.sql(SQL_INSERT)
