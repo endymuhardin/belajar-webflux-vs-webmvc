@@ -4,17 +4,21 @@ import com.muhardin.endy.belajar.bank.webflux.dao.LogTransaksiDao;
 import com.muhardin.endy.belajar.bank.webflux.entity.JenisTransaksi;
 import com.muhardin.endy.belajar.bank.webflux.entity.LogTransaksi;
 import com.muhardin.endy.belajar.bank.webflux.entity.StatusAktivitas;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
-@Service
+@Service @Slf4j
 public class LogTransaksiService {
 
     @Autowired
     private LogTransaksiDao logTransaksiDao;
+
+    @Autowired private DatabaseClient databaseClient;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Mono<LogTransaksi> catat(JenisTransaksi jenisTransaksi, StatusAktivitas statusAktivitas, String keterangan){

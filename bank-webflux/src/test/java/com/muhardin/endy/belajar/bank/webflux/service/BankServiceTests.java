@@ -38,6 +38,13 @@ public class BankServiceTests {
         ).verifyComplete();
     }
 
+    // Verifikasi error :
+    // select * from running_number : harusnya rollback
+    // select * from mutasi : harusnya rollback
+    // select * from rekening : harusnya rollback
+    // select * from log_transaksi : harusnya tidak rollback (error log tercatat)
+    // hasil method : throw Exception
+
     @Test
     public void testTransferRekeningTidakAktif() {
         // runningnumber rollback (sesuai)

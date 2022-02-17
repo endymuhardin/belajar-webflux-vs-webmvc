@@ -28,28 +28,40 @@ public class BankService {
                 .map(nomor -> JenisTransaksi.TRANSFER.name() + "-" + String.format("%05d",nomor)));
 
         // https://stackoverflow.com/a/53596358 : validasi mono
-        Mono<Rekening> rekeningAsalUpdated = rekeningDao.findByNomor(asal)
+        Mono<Rekening> rekeningAsal = rekeningDao.findByNomor(asal)
                 .flatMap(validasiRekening(asal, tujuan, nilai))
-                .flatMap(updateSaldoRekening(nilai.negate()));
+                .onErrorMap(handleErrorValidasi(asal, tujuan, nilai));
 
-        Mono<Rekening> rekeningTujuanUpdated = rekeningDao.findByNomor(tujuan)
+        Mono<Rekening> rekeningTujuan = rekeningDao.findByNomor(tujuan)
                 .flatMap(validasiRekening(asal, tujuan, nilai))
-                .flatMap(updateSaldoRekening(nilai));
+                .onErrorMap(handleErrorValidasi(asal, tujuan, nilai));
 
         Mono<LogTransaksi> logSukses = logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
                 keteranganLogTransaksi(asal, tujuan, nilai));
 
-        return Mono.zip(rekeningAsalUpdated, rekeningTujuanUpdated, referensi)
+        return Mono.zip(rekeningAsal, rekeningTujuan, referensi)
                 .flatMapMany(tuple3 -> {
                     Rekening src = tuple3.getT1();
                     Rekening dst = tuple3.getT2();
                     String ref = tuple3.getT3();
                     String keterangan = keteranganTransfer(nilai, tuple3.getT1(), tuple3.getT2());
-                    return Flux.concat(
-                            simpanMutasi(src, keterangan, nilai.negate(), ref),
-                            simpanMutasi(dst, keterangan, nilai, ref));
-                })
-                .flatMap(mutasiDao::save).last().then(logSukses).then();
+
+                    src.setSaldo(src.getSaldo().subtract(nilai));
+                    dst.setSaldo(dst.getSaldo().add(nilai));
+                    return rekeningDao.save(src)
+                            .then(rekeningDao.save(dst))
+                            .flatMapMany(r ->
+                                Flux.concat(
+                                        simpanMutasi(src, keterangan, nilai.negate(), ref),
+                                        simpanMutasi(dst, keterangan, nilai, ref))
+                            );
+                }).flatMap(mutasiDao::save).last().then(logSukses).then();
+    }
+
+    private Function<Throwable, Throwable> handleErrorValidasi(String asal, String tujuan, BigDecimal nilai) {
+        return e -> logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
+                    keteranganLogTransaksi(asal, tujuan, nilai) +" - ["+e.getMessage()+"]")
+                    .as(t -> e);
     }
 
     private Function<Rekening, Mono<? extends Rekening>> validasiRekening(String asal, String tujuan, BigDecimal nilai) {
@@ -66,9 +78,7 @@ public class BankService {
             }
 
             if(error) {
-                return logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
-                                keteranganLogTransaksi(asal, tujuan, nilai) +" - ["+errorMessage+"]")
-                        .then(Mono.error(new IllegalStateException(errorMessage)));
+                return Mono.error(new IllegalStateException(errorMessage));
             }
             return Mono.just(r);
         };
