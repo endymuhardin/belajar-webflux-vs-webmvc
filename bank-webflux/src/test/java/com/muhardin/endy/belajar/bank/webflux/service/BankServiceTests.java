@@ -47,10 +47,6 @@ public class BankServiceTests {
 
     @Test
     public void testTransferRekeningTidakAktif() {
-        // runningnumber rollback (sesuai)
-        // mutasi rollback (sesuai)
-        // log error tidak rollback (sesuai)
-        // update saldo rekening pertama tidak rollback (tidak sesuai)
         StepVerifier.create(
             bankService.transfer("N-001", "N-003", new BigDecimal(25000))
         ).verifyError();
@@ -58,10 +54,6 @@ public class BankServiceTests {
 
     @Test
     public void testTransferSaldoKurang() {
-        // runningnumber rollback (sesuai)
-        // mutasi rollback (sesuai)
-        // log error rollback (tidak sesuai)
-        // update saldo rekening rollback (sesuai)
         StepVerifier.create(
                 bankService.transfer("N-001", "N-002", new BigDecimal(25000000))
         ).verifyError();

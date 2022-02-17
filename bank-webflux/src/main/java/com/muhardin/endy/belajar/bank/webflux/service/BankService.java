@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
 
 import java.math.BigDecimal;
 import java.util.function.Function;
@@ -30,13 +29,13 @@ public class BankService {
         // https://stackoverflow.com/a/53596358 : validasi mono
         Mono<Rekening> rekeningAsal = rekeningDao.findByNomor(asal)
                 .flatMap(validasiRekening(nilai))
-                .onErrorMap(handleErrorValidasi(asal, tujuan, nilai));
+                .onErrorMap(logErrorValidasi(asal, tujuan, nilai));
 
         Mono<Rekening> rekeningTujuan = rekeningDao.findByNomor(tujuan)
                 .flatMap(validasiRekening(nilai))
-                .onErrorMap(handleErrorValidasi(asal, tujuan, nilai));
+                .onErrorMap(logErrorValidasi(asal, tujuan, nilai));
 
-        Mono<LogTransaksi> logSukses = logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
+        Mono<Void> logSukses = logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
                 keteranganTransfer(asal, tujuan, nilai));
 
         return
@@ -63,20 +62,10 @@ public class BankService {
             .flatMap(mutasiDao::save).last().then(logSukses).then();
     }
 
-    private Function<Tuple2<Rekening, String>, Mono<? extends Mutasi>> mutasiRekening(String asal, String tujuan, BigDecimal nilai) {
-        return tuple2-> simpanMutasi(tuple2.getT1(), keteranganTransfer(asal, tujuan, nilai), nilai, tuple2.getT2());
-    }
-
-    private Function<Rekening, Mono<? extends Rekening>> updateSaldo(BigDecimal nilai) {
-        return r -> {
-            r.setSaldo(r.getSaldo().add(nilai));
-            return rekeningDao.save(r);
-        };
-    }
-
-    private Function<Throwable, Throwable> handleErrorValidasi(String asal, String tujuan, BigDecimal nilai) {
-        return e -> logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
-                    keteranganTransfer(asal, tujuan, nilai) +" - ["+e.getMessage()+"]")
+    private Function<Throwable, Throwable> logErrorValidasi(String asal, String tujuan, BigDecimal nilai) {
+        return e ->
+            logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
+                            keteranganTransfer(asal, tujuan, nilai) +" - ["+e.getMessage()+"]")
                     .as(t -> e);
     }
 
