@@ -18,24 +18,24 @@ public class BankServiceTests {
     @Autowired private BankService bankService;
 
     @Test
-    public void testTransferSukses() {
-        bankService.transfer("N-001", "N-002", new BigDecimal(25000));
+    public void testTransferSuccess() {
+        bankService.transfer("C-001", "C-002", new BigDecimal(25000));
     }
 
     @Test
-    public void testTransferRekeningTidakAktif() {
-        bankService.transfer("N-001", "N-003", new BigDecimal(25000));
+    public void testTransferInactiveAccount() {
+        bankService.transfer("C-001", "C-003", new BigDecimal(25000));
     }
 
     @Test
-    public void testTransferSaldoKurang() {
-        bankService.transfer("N-001", "N-002", new BigDecimal(25000000));
+    public void testTransferInsufficientBalance() {
+        bankService.transfer("C-001", "C-002", new BigDecimal(25000000));
     }
 
     @Test
     public void testMultithreading() throws Exception {
         // inisialisasi dulu running numbernya
-        bankService.transfer("N-001", "N-002", new BigDecimal(25000));
+        bankService.transfer("C-001", "C-002", new BigDecimal(25000));
         Thread.sleep(1000);
 
         int numThread = 5;
@@ -88,7 +88,7 @@ class TransferThread implements Runnable {
     public void run() {
         for (int i = 0; i < iteration; i++) {
             System.out.println("Thread " + threadNumber + " : iterasi : " + i);
-            bankService.transfer("N-001", "N-002", new BigDecimal(1000));
+            bankService.transfer("C-001", "C-002", new BigDecimal(1000));
         }
         completed = true;
     }

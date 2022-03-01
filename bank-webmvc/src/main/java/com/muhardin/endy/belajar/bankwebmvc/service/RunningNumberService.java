@@ -1,7 +1,7 @@
 package com.muhardin.endy.belajar.bankwebmvc.service;
 
 import com.muhardin.endy.belajar.bankwebmvc.dao.RunningNumberDao;
-import com.muhardin.endy.belajar.bankwebmvc.entity.JenisTransaksi;
+import com.muhardin.endy.belajar.bankwebmvc.entity.TransactionType;
 import com.muhardin.endy.belajar.bankwebmvc.entity.RunningNumber;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,18 +14,18 @@ public class RunningNumberService {
 
     @Autowired private RunningNumberDao runningNumberDao;
 
-    public Long ambilNomor(JenisTransaksi jenisTransaksi){
-        LocalDate awalBulan = LocalDate.now().withDayOfMonth(1);
-        RunningNumber runningNumber = runningNumberDao.findByJenisTransaksiAndResetPeriod(jenisTransaksi, awalBulan);
+    public Long generateNumber(TransactionType transactionType){
+        LocalDate startOfNumber = LocalDate.now().withDayOfMonth(1);
+        RunningNumber runningNumber = runningNumberDao.findByTransactionTypeAndResetPeriod(transactionType, startOfNumber);
         if (runningNumber == null) {
             runningNumber = new RunningNumber();
-            runningNumber.setAngkaTerakhir(0L);
-            runningNumber.setResetPeriod(awalBulan);
-            runningNumber.setJenisTransaksi(jenisTransaksi);
+            runningNumber.setLastNumber(0L);
+            runningNumber.setResetPeriod(startOfNumber);
+            runningNumber.setTransactionType(transactionType);
         }
 
-        runningNumber.setAngkaTerakhir(runningNumber.getAngkaTerakhir() + 1);
+        runningNumber.setLastNumber(runningNumber.getLastNumber() + 1);
         runningNumberDao.save(runningNumber);
-        return runningNumber.getAngkaTerakhir();
+        return runningNumber.getLastNumber();
     }
 }

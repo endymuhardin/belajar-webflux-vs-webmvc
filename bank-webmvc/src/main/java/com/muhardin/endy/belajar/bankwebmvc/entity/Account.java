@@ -9,11 +9,11 @@ import javax.persistence.Id;
 import java.math.BigDecimal;
 
 @Entity @Data
-public class Rekening {
+public class Account {
     @Id @GeneratedValue(generator = "uuid2") @GenericGenerator(name = "uuid2", strategy = "uuid2")
     private String id;
-    private String nomor;
-    private String nama;
-    private BigDecimal saldo;
-    private Boolean aktif;
+    private String accountNumber;
+    private String name;
+    private BigDecimal balance;
+    private Boolean active;
 }

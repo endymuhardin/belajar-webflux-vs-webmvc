@@ -1,11 +1,11 @@
 package com.muhardin.endy.belajar.bankwebmvc.service;
 
-import com.muhardin.endy.belajar.bankwebmvc.dao.MutasiDao;
-import com.muhardin.endy.belajar.bankwebmvc.dao.RekeningDao;
-import com.muhardin.endy.belajar.bankwebmvc.entity.JenisTransaksi;
-import com.muhardin.endy.belajar.bankwebmvc.entity.Mutasi;
-import com.muhardin.endy.belajar.bankwebmvc.entity.Rekening;
-import com.muhardin.endy.belajar.bankwebmvc.entity.StatusAktivitas;
+import com.muhardin.endy.belajar.bankwebmvc.dao.TransactionHistoryDao;
+import com.muhardin.endy.belajar.bankwebmvc.dao.AccountDao;
+import com.muhardin.endy.belajar.bankwebmvc.entity.Account;
+import com.muhardin.endy.belajar.bankwebmvc.entity.TransactionType;
+import com.muhardin.endy.belajar.bankwebmvc.entity.TransactionHistory;
+import com.muhardin.endy.belajar.bankwebmvc.entity.ActivityStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,79 +15,79 @@ import java.math.BigDecimal;
 @Service @Transactional
 public class BankService {
 
-    @Autowired private RekeningDao rekeningDao;
-    @Autowired private MutasiDao mutasiDao;
+    @Autowired private AccountDao accountDao;
+    @Autowired private TransactionHistoryDao transactionHistoryDao;
 
     @Autowired private RunningNumberService runningNumberService;
-    @Autowired private LogTransaksiService logTransaksiService;
+    @Autowired private TransactionLogService transactionLogService;
 
-    public void transfer(String asal, String tujuan, BigDecimal nilai){
+    public void transfer(String src, String dst, BigDecimal amount){
 
-        logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.MULAI,
-                keteranganLogTransaksi(asal, tujuan, nilai));
+        transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.START,
+                transactionLog(src, dst, amount));
 
-        String referensi = JenisTransaksi.TRANSFER.name()
+        String reference = TransactionType.TRANSFER.name()
                 + "-" + String.format("%05d",
-                runningNumberService.ambilNomor(JenisTransaksi.TRANSFER));
+                runningNumberService.generateNumber(TransactionType.TRANSFER));
 
-        Rekening rekeningAsal = rekeningDao.findByNomor(asal);
-        Rekening rekeningTujuan = rekeningDao.findByNomor(tujuan);
+        Account source = accountDao.findByAccountNumber(src);
+        Account destination = accountDao.findByAccountNumber(dst);
 
-        if(rekeningTidakAktif(rekeningAsal, rekeningTujuan)) {
-            logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
-                    keteranganLogTransaksi(asal, tujuan, nilai) +" - [REKENING TIDAK AKTIF]");
-            throw new IllegalArgumentException("Rekening tidak aktif");
+        if(accountIsInactive(source, destination)) {
+            transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
+                    transactionLog(src, dst, amount) +" - [INACTIVE ACCOUNT]");
+            throw new IllegalArgumentException("Inactive account");
         }
 
-        if (saldoKurang(rekeningAsal, nilai)) {
-            logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.GAGAL,
-                    keteranganLogTransaksi(asal, tujuan, nilai) +" - [SALDO KURANG]");
-            throw new IllegalStateException("Saldo tidak cukup");
+        if (balanceIsNotSufficient(source, amount)) {
+            transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
+                    transactionLog(src, dst, amount) +" - [INSUFFICIENT BALANCE]");
+            throw new IllegalStateException("Insufficient balance");
         }
 
-        updateSaldoRekeningTransfer(rekeningAsal, rekeningTujuan, nilai);
-        simpanMutasiTransfer(rekeningAsal, rekeningTujuan, nilai, referensi);
+        updateAccountBalance(source, destination, amount);
+        saveTransactionHistory(source, destination, amount, reference);
 
-        logTransaksiService.catat(JenisTransaksi.TRANSFER, StatusAktivitas.SUKSES,
-                keteranganLogTransaksi(asal, tujuan, nilai));
+        transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.SUCCESS,
+                transactionLog(src, dst, amount));
     }
 
-    private String keteranganLogTransaksi(String asal, String tujuan, BigDecimal nilai) {
-        return "Transfer "+asal+" -> "+tujuan+ " ["+nilai+"]";
+    private String transactionLog(String src, String dest, BigDecimal amount) {
+        return "Transfer "+src+" -> "+dest+ " ["+amount+"]";
     }
 
-    private void simpanMutasiTransfer(Rekening rekeningAsal, Rekening rekeningTujuan, BigDecimal nilai, String referensi) {
-        String keterangan = keteranganTransfer(nilai, rekeningAsal, rekeningTujuan);
-        simpanMutasi(rekeningAsal, keterangan, nilai.negate(), referensi);
-        simpanMutasi(rekeningTujuan, keterangan, nilai, referensi);
+    private void saveTransactionHistory(Account source, Account destination, BigDecimal amount, String reference) {
+        String remarks = transferRemarks(amount, source, destination);
+        saveTransactionHistory(source, remarks, amount.negate(), reference);
+        saveTransactionHistory(destination, remarks, amount, reference);
     }
 
-    private void updateSaldoRekeningTransfer(Rekening rekeningAsal, Rekening rekeningTujuan, BigDecimal nilai) {
-        rekeningAsal.setSaldo(rekeningAsal.getSaldo().subtract(nilai));
-        rekeningTujuan.setSaldo(rekeningTujuan.getSaldo().add(nilai));
-        rekeningDao.save(rekeningAsal);
-        rekeningDao.save(rekeningTujuan);
+    private void updateAccountBalance(Account source, Account destination, BigDecimal amount) {
+        source.setBalance(source.getBalance().subtract(amount));
+        destination.setBalance(destination.getBalance().add(amount));
+        accountDao.save(source);
+        accountDao.save(destination);
     }
 
-    private void simpanMutasi(Rekening rekening, String keterangan, BigDecimal nilai, String referensi) {
-        Mutasi mutasi = new Mutasi();
-        mutasi.setRekening(rekening);
-        mutasi.setJenisTransaksi(JenisTransaksi.TRANSFER);
-        mutasi.setKeterangan(keterangan);
-        mutasi.setNilai(nilai);
-        mutasi.setReferensi(referensi+"-"+rekening.getNomor());
-        mutasiDao.save(mutasi);
+    private void saveTransactionHistory(Account account, String remarks, BigDecimal amount, String reference) {
+        TransactionHistory transactionHistory = new TransactionHistory();
+        transactionHistory.setAccount(account);
+        transactionHistory.setTransactionType(TransactionType.TRANSFER);
+        transactionHistory.setRemarks(remarks);
+        transactionHistory.setAmount(amount);
+        transactionHistory.setReference(reference+"-"+ account.getAccountNumber());
+        transactionHistoryDao.save(transactionHistory);
     }
 
-    private String keteranganTransfer(BigDecimal nilai, Rekening rekeningAsal, Rekening rekeningTujuan) {
-        return "Transfer dari "+ rekeningAsal.getNomor() + " ke "+ rekeningTujuan.getNomor()+" senilai "+ nilai;
+    private String transferRemarks(BigDecimal amount, Account source, Account destination) {
+        return "Transfer from "+ source.getAccountNumber() + " to "+ destination.getAccountNumber()+" for "+ amount;
     }
 
-    private boolean saldoKurang(Rekening rekeningAsal, BigDecimal nilai) {
-        return nilai.compareTo(rekeningAsal.getSaldo()) > 0;
+    private boolean balanceIsNotSufficient(Account source, BigDecimal amount) {
+        return amount.compareTo(source.getBalance()) > 0;
     }
 
-    private boolean rekeningTidakAktif(Rekening rekeningAsal, Rekening rekeningTujuan) {
-        return !(rekeningAsal.getAktif() && rekeningTujuan.getAktif());
+    private boolean accountIsInactive(Account source, Account destination) {
+        return !(source.getActive() && destination.getActive());
     }
 }

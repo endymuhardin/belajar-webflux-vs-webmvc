@@ -1,7 +1,7 @@
 package com.muhardin.endy.belajar.bank.webflux.service;
 
-import com.muhardin.endy.belajar.bank.webflux.entity.JenisTransaksi;
-import com.muhardin.endy.belajar.bank.webflux.entity.StatusAktivitas;
+import com.muhardin.endy.belajar.bank.webflux.entity.TransactionType;
+import com.muhardin.endy.belajar.bank.webflux.entity.ActivityStatus;
 import io.r2dbc.spi.ConnectionFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +16,11 @@ import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 
 @Service @Slf4j
-public class LogTransaksiService {
+public class TransactionLogService {
 
-    private static final String SQL_INSERT = "insert into log_transaksi" +
-            "(jenis_transaksi, status_aktivitas, waktu_aktivitas, keterangan) " +
-            "values (:jenis, :status, :waktu, :keterangan)";
+    private static final String SQL_INSERT = "insert into transaction_log" +
+            "(transaction_type, activity_status, activity_time, remarks) " +
+            "values (:type, :status, :time, :remarks)";
 
     @Autowired
     private ConnectionFactory connectionFactory;
@@ -33,13 +33,13 @@ public class LogTransaksiService {
         databaseClient = DatabaseClient.create(connectionFactory);
     }
 
-    public Mono<Void> catat(JenisTransaksi jenisTransaksi, StatusAktivitas statusAktivitas, String keterangan){
+    public Mono<Void> log(TransactionType transactionType, ActivityStatus activityStatus, String remarks){
         TransactionalOperator rxtx = TransactionalOperator.create(transactionManager);
         return rxtx.execute(txStatus -> databaseClient.sql(SQL_INSERT)
-                .bind("jenis", jenisTransaksi.name())
-                .bind("status", statusAktivitas.name())
-                .bind("waktu", LocalDateTime.now())
-                .bind("keterangan", keterangan)
+                .bind("type", transactionType.name())
+                .bind("status", activityStatus.name())
+                .bind("time", LocalDateTime.now())
+                .bind("remarks", remarks)
                 .then()).then();
     }
 }

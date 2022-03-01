@@ -32,30 +32,30 @@ public class BankServiceTests {
     }
 
     @Test
-    public void testTransferSukses() {
+    public void testTransferSuccess() {
         StepVerifier.create(
-            bankService.transfer("N-001", "N-002", new BigDecimal(25000))
+            bankService.transfer("C-001", "C-002", new BigDecimal(25000))
         ).verifyComplete();
     }
 
-    // Verifikasi error :
-    // select * from running_number : harusnya rollback
-    // select * from mutasi : harusnya rollback
-    // select * from rekening : harusnya rollback
-    // select * from log_transaksi : harusnya tidak rollback (error log tercatat)
-    // hasil method : throw Exception
+    // Expected result :
+    // select * from running_number : should rollback
+    // select * from transaction_history : should rollback
+    // select * from account : should rollback
+    // select * from transaction_log : *should not* rollback (error log inserted into database)
+    // method outcome : throw Exception
 
     @Test
-    public void testTransferRekeningTidakAktif() {
+    public void testTransferInactiveAccount() {
         StepVerifier.create(
-            bankService.transfer("N-001", "N-003", new BigDecimal(25000))
+            bankService.transfer("C-001", "C-003", new BigDecimal(25000))
         ).verifyError();
     }
 
     @Test
-    public void testTransferSaldoKurang() {
+    public void testTransferInsufficientBalance() {
         StepVerifier.create(
-                bankService.transfer("N-001", "N-002", new BigDecimal(25000000))
+                bankService.transfer("C-001", "C-002", new BigDecimal(25000000))
         ).verifyError();
     }
 }

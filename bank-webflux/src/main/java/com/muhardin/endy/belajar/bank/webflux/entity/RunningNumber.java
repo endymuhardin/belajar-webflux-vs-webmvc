@@ -8,7 +8,7 @@ import java.time.LocalDate;
 @Data
 public class RunningNumber {
     @Id private String id;
-    private JenisTransaksi jenisTransaksi;
+    private TransactionType transactionType;
     private LocalDate resetPeriod = LocalDate.now();
-    private Long angkaTerakhir;
+    private Long lastNumber;
 }

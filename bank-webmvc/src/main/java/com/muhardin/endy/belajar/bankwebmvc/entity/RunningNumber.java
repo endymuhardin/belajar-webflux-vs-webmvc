@@ -13,7 +13,7 @@ public class RunningNumber {
     private String id;
 
     @Enumerated(EnumType.STRING)
-    private JenisTransaksi jenisTransaksi;
+    private TransactionType transactionType;
     private LocalDate resetPeriod = LocalDate.now();
-    private Long angkaTerakhir;
+    private Long lastNumber;
 }

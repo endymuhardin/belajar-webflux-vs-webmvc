@@ -1,6 +1,6 @@
 package com.muhardin.endy.belajar.bankwebmvc.dao;
 
-import com.muhardin.endy.belajar.bankwebmvc.entity.JenisTransaksi;
+import com.muhardin.endy.belajar.bankwebmvc.entity.TransactionType;
 import com.muhardin.endy.belajar.bankwebmvc.entity.RunningNumber;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.PagingAndSortingRepository;
@@ -11,5 +11,5 @@ import java.time.LocalDate;
 public interface RunningNumberDao extends PagingAndSortingRepository<RunningNumber, String> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    RunningNumber findByJenisTransaksiAndResetPeriod(JenisTransaksi jenisTransaksi, LocalDate awalBulan);
+    RunningNumber findByTransactionTypeAndResetPeriod(TransactionType transactionType, LocalDate awalBulan);
 }

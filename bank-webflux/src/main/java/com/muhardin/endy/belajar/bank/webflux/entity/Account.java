@@ -6,10 +6,10 @@ import org.springframework.data.annotation.Id;
 import java.math.BigDecimal;
 
 @Data
-public class Rekening {
+public class Account {
     @Id private String id;
-    private String nomor;
-    private String nama;
-    private BigDecimal saldo;
-    private Boolean aktif;
+    private String accountNumber;
+    private String name;
+    private BigDecimal balance;
+    private Boolean active;
 }

@@ -4,22 +4,20 @@ import lombok.Data;
 import org.hibernate.annotations.GenericGenerator;
 
 import javax.persistence.*;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity @Data
-public class Mutasi {
+public class TransactionLog {
     @Id
     @GeneratedValue(generator = "uuid2") @GenericGenerator(name = "uuid2", strategy = "uuid2")
     private String id;
 
-    @Enumerated(EnumType.STRING)
-    private JenisTransaksi jenisTransaksi;
+    private LocalDateTime activityTime = LocalDateTime.now();
 
-    @ManyToOne @JoinColumn(name = "id_rekening")
-    private Rekening rekening;
-    private LocalDateTime waktuTransaksi = LocalDateTime.now();
-    private BigDecimal nilai;
-    private String keterangan;
-    private String referensi;
+    @Enumerated(EnumType.STRING)
+    private TransactionType transactionType;
+
+    @Enumerated(EnumType.STRING)
+    private ActivityStatus activityStatus;
+    private String remarks;
 }

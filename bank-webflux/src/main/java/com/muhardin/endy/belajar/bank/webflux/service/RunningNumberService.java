@@ -1,10 +1,9 @@
 package com.muhardin.endy.belajar.bank.webflux.service;
 
 import com.muhardin.endy.belajar.bank.webflux.dao.RunningNumberDao;
-import com.muhardin.endy.belajar.bank.webflux.entity.JenisTransaksi;
+import com.muhardin.endy.belajar.bank.webflux.entity.TransactionType;
 import com.muhardin.endy.belajar.bank.webflux.entity.RunningNumber;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
@@ -16,26 +15,23 @@ public class RunningNumberService {
     @Autowired
     private RunningNumberDao runningNumberDao;
 
-    @Autowired
-    private R2dbcEntityTemplate template;
-
-    public Mono<Long> ambilNomor(JenisTransaksi jenisTransaksi){
-        LocalDate awalBulan = LocalDate.now().withDayOfMonth(1);
-        return runningNumberDao.findByJenisTransaksiAndResetPeriod(jenisTransaksi, awalBulan)
-                .defaultIfEmpty(createRunningNumber(jenisTransaksi, awalBulan))
+    public Mono<Long> generateNumber(TransactionType transactionType){
+        LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1);
+        return runningNumberDao.findByTransactionTypeAndResetPeriod(transactionType, startOfMonth)
+                .defaultIfEmpty(createRunningNumber(transactionType, startOfMonth))
                 .map(r -> {
-                    r.setAngkaTerakhir(r.getAngkaTerakhir() + 1);
+                    r.setLastNumber(r.getLastNumber() + 1);
                     return r;
                 })
                 .flatMap(runningNumberDao::save)
-                .map(r -> r.getAngkaTerakhir());
+                .map(r -> r.getLastNumber());
     }
 
-    private RunningNumber createRunningNumber(JenisTransaksi jenisTransaksi, LocalDate resetPeriod){
+    private RunningNumber createRunningNumber(TransactionType transactionType, LocalDate resetPeriod){
         RunningNumber runningNumber = new RunningNumber();
-        runningNumber.setAngkaTerakhir(0L);
+        runningNumber.setLastNumber(0L);
         runningNumber.setResetPeriod(resetPeriod);
-        runningNumber.setJenisTransaksi(jenisTransaksi);
+        runningNumber.setTransactionType(transactionType);
         return runningNumber;
     }
 }

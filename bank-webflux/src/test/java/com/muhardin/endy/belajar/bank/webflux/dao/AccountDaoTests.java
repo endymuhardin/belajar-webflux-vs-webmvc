@@ -14,8 +14,8 @@ import java.io.InputStreamReader;
 import java.util.stream.Stream;
 
 @DataR2dbcTest
-public class RekeningDaoTests {
-    @Autowired private RekeningDao rekeningDao;
+public class AccountDaoTests {
+    @Autowired private AccountDao accountDao;
     @Autowired private DatabaseClient databaseClient;
     @Value("classpath:/sql/reset-data.sql") private Resource resetDatabaseScript;
 
@@ -31,7 +31,7 @@ public class RekeningDaoTests {
 
     @Test
     public void testFindAll() throws Exception {
-        rekeningDao.findAll().doOnNext(System.out::println).blockLast();
+        accountDao.findAll().doOnNext(System.out::println).blockLast();
 
     }
 }
