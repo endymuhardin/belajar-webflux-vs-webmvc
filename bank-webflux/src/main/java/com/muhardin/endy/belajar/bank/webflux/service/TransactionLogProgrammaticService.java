@@ -42,11 +42,11 @@ public class TransactionLogProgrammaticService implements TransactionLogService 
 
         TransactionalOperator rxtx = TransactionalOperator.create(transactionManager, tdf);
         log.debug("Transaction log running on thread {}", Thread.currentThread().getName());
-        return rxtx.execute(txStatus -> databaseClient.sql(SQL_INSERT)
+        return databaseClient.sql(SQL_INSERT)
                 .bind("type", transactionType.name())
                 .bind("status", activityStatus.name())
                 .bind("time", LocalDateTime.now())
                 .bind("remarks", remarks)
-                .then()).then();
+                .then().as(rxtx::transactional);
     }
 }
