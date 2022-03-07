@@ -33,34 +33,30 @@ public class BankServiceTests {
 
     @BeforeEach
     public void resetDatabase() throws Exception {
-        String query = StreamUtils.copyToString(resetDatabaseScript.getInputStream(), StandardCharsets.UTF_8);
-        Mono<Void> mono = this.entityTemplate
+        this.entityTemplate
                 .getDatabaseClient()
-                .sql(query)
-                .then();
-
-        StepVerifier.create(mono).verifyComplete();
+                .sql(StreamUtils.copyToString(
+                        resetDatabaseScript.getInputStream(),
+                        StandardCharsets.UTF_8))
+                .then()
+                .as(StepVerifier::create).verifyComplete();
     }
 
     @Test
     public void testTransferProgrammaticSuccess() {
-        StepVerifier.create(
-            bankService.transferProgrammatically("C-001", "C-002", new BigDecimal(25000))
-        ).verifyComplete();
-
+        bankService.transferProgrammatically("C-001", "C-002", new BigDecimal(25000))
+        .as(StepVerifier::create).verifyComplete();
         displayDatabaseContent();
     }
 
     @Test
     public void testTransferDeclarativeSuccess() {
-        StepVerifier.create(
-                bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000))
-        ).verifyComplete();
-
+        bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000))
+        .as(StepVerifier::create).verifyComplete();
         displayDatabaseContent();
     }
 
-    // Expected result :
+    // Exception cases expected result :
     // select * from running_number : should rollback
     // select * from transaction_history : should rollback
     // select * from account : should rollback
@@ -69,30 +65,15 @@ public class BankServiceTests {
 
     @Test
     public void testTransferInactiveAccount() {
-        /*
-        StepVerifier.create(
-            bankService.transferProgrammatically("C-001", "C-003", new BigDecimal(25000))
-        ).verifyError();
+        bankService.transferDeclaratively("C-001", "C-003", new BigDecimal(25000))
+        .as(StepVerifier::create).verifyError();
         displayDatabaseContent();
-        */
-
-        StepVerifier.create(
-                bankService.transferDeclaratively("C-001", "C-003", new BigDecimal(25000))
-        ).verifyError();
-        displayDatabaseContent();
-
     }
 
     @Test
     public void testTransferInsufficientBalance() {
-        StepVerifier.create(
-                bankService.transferProgrammatically("C-001", "C-002", new BigDecimal(25000000))
-        ).verifyError();
-        displayDatabaseContent();
-
-        StepVerifier.create(
-                bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000000))
-        ).verifyError();
+        bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000000))
+        .as(StepVerifier::create).verifyError();
         displayDatabaseContent();
     }
 
@@ -123,14 +104,11 @@ public class BankServiceTests {
         String startLog = "\r\n=== Start "+dataName+" ===";
         String endLog = "===  End "+dataName+"  ===\r\n";
 
-        StepVerifier.create(
-                Mono.just(startLog)
-                        .doOnNext(System.out::println)
-                        .thenMany(data)
-                        .doOnNext(System.out::println)
-                        .doFinally(t -> {
-                                System.out.println(endLog);
-                        }).then()
-        ).verifyComplete();
+        Mono.just(startLog)
+            .doOnNext(System.out::println)
+            .thenMany(data)
+            .doOnNext(System.out::println)
+            .doFinally(t -> System.out.println(endLog))
+        .then().as(StepVerifier::create).verifyComplete();
     }
 }
