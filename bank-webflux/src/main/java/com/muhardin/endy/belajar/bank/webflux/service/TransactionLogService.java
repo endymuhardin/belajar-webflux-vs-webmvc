@@ -35,6 +35,7 @@ public class TransactionLogService {
 
     public Mono<Void> log(TransactionType transactionType, ActivityStatus activityStatus, String remarks){
         TransactionalOperator rxtx = TransactionalOperator.create(transactionManager);
+        log.debug("Transaction log running on thread {}", Thread.currentThread().getName());
         return rxtx.execute(txStatus -> databaseClient.sql(SQL_INSERT)
                 .bind("type", transactionType.name())
                 .bind("status", activityStatus.name())

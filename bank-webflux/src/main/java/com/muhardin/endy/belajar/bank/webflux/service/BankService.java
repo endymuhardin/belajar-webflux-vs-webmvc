@@ -3,6 +3,7 @@ package com.muhardin.endy.belajar.bank.webflux.service;
 import com.muhardin.endy.belajar.bank.webflux.dao.TransactionHistoryDao;
 import com.muhardin.endy.belajar.bank.webflux.dao.AccountDao;
 import com.muhardin.endy.belajar.bank.webflux.entity.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,7 +13,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.util.function.Function;
 
-@Service @Transactional
+@Service @Transactional @Slf4j
 public class BankService {
 
     @Autowired private AccountDao accountDao;
@@ -26,7 +27,7 @@ public class BankService {
                 .then(runningNumberService.generateNumber(TransactionType.TRANSFER)
                 .map(number -> TransactionType.TRANSFER.name() + "-" + String.format("%05d",number)));
 
-        // https://stackoverflow.com/a/53596358 : validasi mono
+        // https://stackoverflow.com/a/53596358 : how to validate
         Mono<Account> sourceAccount = accountDao.findByAccountNumber(sourceAccountNumber)
                 .flatMap(validateAccount(amount))
                 .onErrorMap(logValidationError(sourceAccountNumber, destinationAccountNumber, amount));
@@ -49,6 +50,7 @@ public class BankService {
 
                 src.setBalance(src.getBalance().subtract(amount));
                 dst.setBalance(dst.getBalance().add(amount));
+                log.debug("Transfer running on thread {}", Thread.currentThread().getName());
 
                 return
                     accountDao.save(src)
