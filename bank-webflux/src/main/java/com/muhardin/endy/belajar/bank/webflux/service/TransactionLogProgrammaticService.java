@@ -9,7 +9,9 @@ import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.ReactiveTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.reactive.TransactionalOperator;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
@@ -34,7 +36,11 @@ public class TransactionLogProgrammaticService implements TransactionLogService 
     }
 
     public Mono<Void> log(TransactionType transactionType, ActivityStatus activityStatus, String remarks){
-        TransactionalOperator rxtx = TransactionalOperator.create(transactionManager);
+        DefaultTransactionDefinition tdf = new DefaultTransactionDefinition();
+        tdf.setName(this.getClass().getName());
+        tdf.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        TransactionalOperator rxtx = TransactionalOperator.create(transactionManager, tdf);
         log.debug("Transaction log running on thread {}", Thread.currentThread().getName());
         return rxtx.execute(txStatus -> databaseClient.sql(SQL_INSERT)
                 .bind("type", transactionType.name())
