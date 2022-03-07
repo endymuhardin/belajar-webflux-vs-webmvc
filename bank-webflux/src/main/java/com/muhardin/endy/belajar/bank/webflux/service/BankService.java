@@ -41,11 +41,13 @@ public class BankService {
         // https://stackoverflow.com/a/53596358 : how to validate
         Mono<Account> sourceAccount = accountDao.findByAccountNumber(sourceAccountNumber)
                 .flatMap(validateAccount(amount))
-                .onErrorMap(logValidationError(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService));
+                .doOnError(e -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
+                        transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) +" - ["+e.getMessage()+"]"));
 
         Mono<Account> destinationAccount = accountDao.findByAccountNumber(destinationAccountNumber)
                 .flatMap(validateAccount(amount))
-                .onErrorMap(logValidationError(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService));
+                .doOnError(e -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
+                        transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) +" - ["+e.getMessage()+"]"));
 
         Mono<Void> successLog = transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.SUCCESS,
                 transferRemarks(sourceAccountNumber, destinationAccountNumber, amount));
@@ -54,7 +56,6 @@ public class BankService {
             Mono.zip(sourceAccount, destinationAccount, reference)
             .flatMapMany(tuple3 -> {
                 Account src = tuple3.getT1();
-
                 Account dst = tuple3.getT2();
                 String ref = tuple3.getT3();
                 String remarks = transferRemarks(sourceAccountNumber, destinationAccountNumber, amount);
