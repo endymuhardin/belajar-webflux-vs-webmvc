@@ -13,15 +13,26 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.util.function.Function;
 
-@Service @Transactional @Slf4j
+@Service @Slf4j
 public class BankService {
 
     @Autowired private AccountDao accountDao;
     @Autowired private TransactionHistoryDao transactionHistoryDao;
     @Autowired private RunningNumberService runningNumberService;
-    @Autowired private TransactionLogService transactionLogService;
+    @Autowired private TransactionLogProgrammaticService transactionLogProgrammaticService;
+    @Autowired private TransactionLogDeclarativeService transactionLogDeclarativeService;
 
-    public Mono<Void> transfer(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount){
+    @Transactional
+    public Mono<Void> transferProgrammatically(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount) {
+        return transfer(sourceAccountNumber, destinationAccountNumber, amount, transactionLogProgrammaticService);
+    }
+
+    @Transactional
+    public Mono<Void> transferDeclaratively(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount) {
+        return transfer(sourceAccountNumber, destinationAccountNumber, amount, transactionLogDeclarativeService);
+    }
+
+    private Mono<Void> transfer(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount, TransactionLogService transactionLogService){
         Mono<String> reference = transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.START,
                         transferRemarks(sourceAccountNumber, destinationAccountNumber, amount))
                 .then(runningNumberService.generateNumber(TransactionType.TRANSFER)
@@ -30,11 +41,11 @@ public class BankService {
         // https://stackoverflow.com/a/53596358 : how to validate
         Mono<Account> sourceAccount = accountDao.findByAccountNumber(sourceAccountNumber)
                 .flatMap(validateAccount(amount))
-                .onErrorMap(logValidationError(sourceAccountNumber, destinationAccountNumber, amount));
+                .onErrorMap(logValidationError(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService));
 
         Mono<Account> destinationAccount = accountDao.findByAccountNumber(destinationAccountNumber)
                 .flatMap(validateAccount(amount))
-                .onErrorMap(logValidationError(sourceAccountNumber, destinationAccountNumber, amount));
+                .onErrorMap(logValidationError(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService));
 
         Mono<Void> successLog = transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.SUCCESS,
                 transferRemarks(sourceAccountNumber, destinationAccountNumber, amount));
@@ -64,9 +75,9 @@ public class BankService {
             .flatMap(transactionHistoryDao::save).last().then(successLog).then();
     }
 
-    private Function<Throwable, Throwable> logValidationError(String src, String dst, BigDecimal amount) {
+    private Function<Throwable, Throwable> logValidationError(String src, String dst, BigDecimal amount, TransactionLogService transactionLogService) {
         return e ->
-            transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
+                transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
                             transferRemarks(src, dst, amount) +" - ["+e.getMessage()+"]")
                     .as(t -> e);
     }

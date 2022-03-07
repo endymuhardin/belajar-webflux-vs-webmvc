@@ -1,5 +1,9 @@
 package com.muhardin.endy.belajar.bank.webflux.service;
 
+import com.muhardin.endy.belajar.bank.webflux.dao.AccountDao;
+import com.muhardin.endy.belajar.bank.webflux.dao.RunningNumberDao;
+import com.muhardin.endy.belajar.bank.webflux.dao.TransactionHistoryDao;
+import com.muhardin.endy.belajar.bank.webflux.dao.TransactionLogDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.Resource;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.util.StreamUtils;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -16,6 +21,12 @@ import java.nio.charset.StandardCharsets;
 
 @SpringBootTest
 public class BankServiceTests {
+
+    @Autowired private RunningNumberDao runningNumberDao;
+    @Autowired private TransactionHistoryDao transactionHistoryDao;
+    @Autowired private TransactionLogDao transactionLogDao;
+    @Autowired private AccountDao accountDao;
+
     @Autowired private BankService bankService;
     @Autowired private R2dbcEntityTemplate entityTemplate;
     @Value("classpath:/sql/reset-data.sql") private Resource resetDatabaseScript;
@@ -32,10 +43,21 @@ public class BankServiceTests {
     }
 
     @Test
-    public void testTransferSuccess() {
+    public void testTransferProgrammaticSuccess() {
         StepVerifier.create(
-            bankService.transfer("C-001", "C-002", new BigDecimal(25000))
+            bankService.transferProgrammatically("C-001", "C-002", new BigDecimal(25000))
         ).verifyComplete();
+
+        displayDatabaseContent();
+    }
+
+    @Test
+    public void testTransferDeclarativeSuccess() {
+        StepVerifier.create(
+                bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000))
+        ).verifyComplete();
+
+        displayDatabaseContent();
     }
 
     // Expected result :
@@ -47,15 +69,68 @@ public class BankServiceTests {
 
     @Test
     public void testTransferInactiveAccount() {
+        /*
         StepVerifier.create(
-            bankService.transfer("C-001", "C-003", new BigDecimal(25000))
+            bankService.transferProgrammatically("C-001", "C-003", new BigDecimal(25000))
         ).verifyError();
+        displayDatabaseContent();
+        */
+
+        StepVerifier.create(
+                bankService.transferDeclaratively("C-001", "C-003", new BigDecimal(25000))
+        ).verifyError();
+        displayDatabaseContent();
+
     }
 
     @Test
     public void testTransferInsufficientBalance() {
         StepVerifier.create(
-                bankService.transfer("C-001", "C-002", new BigDecimal(25000000))
+                bankService.transferProgrammatically("C-001", "C-002", new BigDecimal(25000000))
         ).verifyError();
+        displayDatabaseContent();
+
+        StepVerifier.create(
+                bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000000))
+        ).verifyError();
+        displayDatabaseContent();
+    }
+
+    private void displayDatabaseContent() {
+        displayAccount();
+        displayTransactionHistory();
+        displayRunningNumber();
+        displayTransactionLog();
+    }
+
+    private void displayRunningNumber() {
+        displayData("Running Number", runningNumberDao.findAll());
+    }
+
+    private void displayTransactionLog() {
+        displayData("Transaction Log", transactionLogDao.findAll());
+    }
+
+    private void displayAccount() {
+        displayData("Account", accountDao.findAll());
+    }
+
+    private void displayTransactionHistory() {
+        displayData("Transaction History", transactionHistoryDao.findAll());
+    }
+
+    private void displayData(String dataName, Flux<? extends Object> data) {
+        String startLog = "\r\n=== Start "+dataName+" ===";
+        String endLog = "===  End "+dataName+"  ===\r\n";
+
+        StepVerifier.create(
+                Mono.just(startLog)
+                        .doOnNext(System.out::println)
+                        .thenMany(data)
+                        .doOnNext(System.out::println)
+                        .doFinally(t -> {
+                                System.out.println(endLog);
+                        }).then()
+        ).verifyComplete();
     }
 }
