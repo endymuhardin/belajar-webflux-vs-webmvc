@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 @Service @Slf4j
@@ -48,43 +49,49 @@ public class BankService {
                 .findByAccountNumber(destinationAccountNumber)
                 .flatMap(validateAccount(amount));
 
-        Mono<Void> processTransfer = Mono.zip(sourceAccount, destinationAccount, reference)
-            .flatMapMany(tuple3 -> {
-                Account src = tuple3.getT1();
-                Account dst = tuple3.getT2();
-                String ref = tuple3.getT3();
-                String remarks = transferRemarks(sourceAccountNumber, destinationAccountNumber, amount);
-
-                src.setBalance(src.getBalance().subtract(amount));
-                dst.setBalance(dst.getBalance().add(amount));
-                log.debug("Transfer running on thread {}", Thread.currentThread().getName());
-
-                return
-                    accountDao.save(src)
-                    .then(accountDao.save(dst))
-                    .thenMany(
-                        Flux.concat(
-                        saveTransactionHistory(src, remarks, amount.negate(), ref),
-                        saveTransactionHistory(dst, remarks, amount, ref))
-                    );
-            })
-            .flatMap(transactionHistoryDao::save).then();
-
-        Mono<Void> successLog = transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.SUCCESS,
-                transferRemarks(sourceAccountNumber, destinationAccountNumber, amount));
-
-        Mono<Void> transferHandleError = Mono.usingWhen(
-                Mono.just("run"),
-                x -> processTransfer,
-                x -> successLog,
-                (d,e) -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
-                        transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) + " - [" + e.getMessage() + "]"),
+        Mono<Void> processTransfer = Mono.usingWhen(
+                reference,
+                transfer(sourceAccount, destinationAccount, amount),
+                successLog(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService),
+                errorLog(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService),
                 x -> Mono.error(new IllegalStateException("Transfer cancelled")));
 
-        return startLog.then(transferHandleError);
+        return startLog.then(processTransfer);
     }
 
-    private Function<Account, Mono<? extends Account>> validateAccount(BigDecimal amount) {
+    private Function<String, Mono<Void>> successLog(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount, TransactionLogService transactionLogService) {
+        return ref -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.SUCCESS,
+                transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) + " - ["+ref+"]");
+    }
+
+    private BiFunction<String, Throwable, Mono<Void>> errorLog(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount, TransactionLogService transactionLogService) {
+        return (d,e) -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
+                transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) + " - [" + e.getMessage() + "]");
+    }
+
+    private Function<String, Mono<Void>> transfer(Mono<Account> sourceAccount, Mono<Account> destinationAccount, BigDecimal amount) {
+        return transactionReference -> Mono.zip(sourceAccount, destinationAccount)
+                .flatMapMany(tuple2 -> {
+                    Account src = tuple2.getT1();
+                    Account dst = tuple2.getT2();
+                    String remarks = transferRemarks(src.getAccountNumber(), dst.getAccountNumber(), amount);
+
+                    src.setBalance(src.getBalance().subtract(amount));
+                    dst.setBalance(dst.getBalance().add(amount));
+                    log.debug("Transfer running on thread {}", Thread.currentThread().getName());
+
+                    return accountDao.save(src)
+                        .then(accountDao.save(dst))
+                        .thenMany(
+                            Flux.concat(
+                                    saveTransactionHistory(src, remarks, amount.negate(), transactionReference),
+                                    saveTransactionHistory(dst, remarks, amount, transactionReference))
+                        );
+                })
+                .flatMap(transactionHistoryDao::save).then();
+    }
+
+    private Function<Account, Mono<Account>> validateAccount(BigDecimal amount) {
         return r -> {
             if(insufficientBalance(r, amount)) {
                 return Mono.error(new IllegalStateException("Insufficient balance"));
