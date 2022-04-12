@@ -20,20 +20,10 @@ public class BankService {
     @Autowired private AccountDao accountDao;
     @Autowired private TransactionHistoryDao transactionHistoryDao;
     @Autowired private RunningNumberService runningNumberService;
-    @Autowired private TransactionLogProgrammaticService transactionLogProgrammaticService;
-    @Autowired private TransactionLogDeclarativeService transactionLogDeclarativeService;
+    @Autowired private TransactionLogService transactionLogService;
 
     @Transactional
-    public Mono<Void> transferProgrammatically(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount) {
-        return transfer(sourceAccountNumber, destinationAccountNumber, amount, transactionLogProgrammaticService);
-    }
-
-    @Transactional
-    public Mono<Void> transferDeclaratively(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount) {
-        return transfer(sourceAccountNumber, destinationAccountNumber, amount, transactionLogDeclarativeService);
-    }
-
-    private Mono<Void> transfer(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount, TransactionLogService transactionLogService){
+    public Mono<Void> transfer(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount){
         Mono<Void> startLog = transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.START,
                 transferRemarks(sourceAccountNumber, destinationAccountNumber, amount));
 
@@ -52,19 +42,19 @@ public class BankService {
         Mono<Void> processTransfer = Mono.usingWhen(
                 reference,
                 transfer(sourceAccount, destinationAccount, amount),
-                successLog(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService),
-                errorLog(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService),
+                successLog(sourceAccountNumber, destinationAccountNumber, amount),
+                errorLog(sourceAccountNumber, destinationAccountNumber, amount),
                 x -> Mono.error(new IllegalStateException("Transfer cancelled")));
 
         return startLog.then(processTransfer);
     }
 
-    private Function<String, Mono<Void>> successLog(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount, TransactionLogService transactionLogService) {
+    private Function<String, Mono<Void>> successLog(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount) {
         return ref -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.SUCCESS,
                 transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) + " - ["+ref+"]");
     }
 
-    private BiFunction<String, Throwable, Mono<Void>> errorLog(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount, TransactionLogService transactionLogService) {
+    private BiFunction<String, Throwable, Mono<Void>> errorLog(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount) {
         return (d,e) -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
                 transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) + " - [" + e.getMessage() + "]");
     }

@@ -43,15 +43,8 @@ public class BankServiceTests {
     }
 
     @Test
-    public void testTransferProgrammaticSuccess() {
-        bankService.transferProgrammatically("C-001", "C-002", new BigDecimal(25000))
-        .as(StepVerifier::create).verifyComplete();
-        displayDatabaseContent();
-    }
-
-    @Test
-    public void testTransferDeclarativeSuccess() {
-        bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000))
+    public void testTransferSuccess() {
+        bankService.transfer("C-001", "C-002", new BigDecimal(25000))
         .as(StepVerifier::create).verifyComplete();
         displayDatabaseContent();
     }
@@ -65,14 +58,14 @@ public class BankServiceTests {
 
     @Test
     public void testTransferInactiveAccount() {
-        bankService.transferProgrammatically("C-001", "C-003", new BigDecimal(25000))
+        bankService.transfer("C-001", "C-003", new BigDecimal(25000))
         .as(StepVerifier::create).verifyError();
         displayDatabaseContent();
     }
 
     @Test
     public void testTransferInsufficientBalance() {
-        bankService.transferDeclaratively("C-001", "C-002", new BigDecimal(25000000))
+        bankService.transfer("C-001", "C-002", new BigDecimal(25000000))
         .as(StepVerifier::create).verifyError();
         displayDatabaseContent();
     }
