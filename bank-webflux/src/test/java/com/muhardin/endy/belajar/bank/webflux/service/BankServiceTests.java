@@ -65,7 +65,7 @@ public class BankServiceTests {
 
     @Test
     public void testTransferInactiveAccount() {
-        bankService.transferDeclaratively("C-001", "C-003", new BigDecimal(25000))
+        bankService.transferProgrammatically("C-001", "C-003", new BigDecimal(25000))
         .as(StepVerifier::create).verifyError();
         displayDatabaseContent();
     }
