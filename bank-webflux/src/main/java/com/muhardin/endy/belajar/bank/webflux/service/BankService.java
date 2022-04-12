@@ -11,7 +11,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 @Service @Slf4j
@@ -41,15 +40,13 @@ public class BankService {
                 .map(number -> TransactionType.TRANSFER.name() + "-" + String.format("%05d",number));
 
         // https://stackoverflow.com/a/53596358 : how to validate
-        Mono<Account> sourceAccount = accountDao.findByAccountNumber(sourceAccountNumber)
-                .flatMap(validateAccount(amount))
-                .doOnError(e -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
-                        transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) +" - ["+e.getMessage()+"]"));
+        Mono<Account> sourceAccount = accountDao
+                .findByAccountNumber(sourceAccountNumber)
+                .flatMap(validateAccount(amount));
 
-        Mono<Account> destinationAccount = accountDao.findByAccountNumber(destinationAccountNumber)
-                .flatMap(validateAccount(amount))
-                .doOnError(e -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
-                        transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) +" - ["+e.getMessage()+"]"));
+        Mono<Account> destinationAccount = accountDao
+                .findByAccountNumber(destinationAccountNumber)
+                .flatMap(validateAccount(amount));
 
         Mono<Void> processTransfer = Mono.zip(sourceAccount, destinationAccount, reference)
             .flatMapMany(tuple3 -> {
@@ -76,15 +73,15 @@ public class BankService {
         Mono<Void> successLog = transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.SUCCESS,
                 transferRemarks(sourceAccountNumber, destinationAccountNumber, amount));
 
-        return startLog
-                .then(processTransfer)
-                .then(successLog)
-                .doOnError(logTransferError(sourceAccountNumber, destinationAccountNumber, amount, transactionLogService));
-    }
+        Mono<Void> transferHandleError = Mono.usingWhen(
+                Mono.just("run"),
+                x -> processTransfer,
+                x -> successLog,
+                (d,e) -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
+                        transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) + " - [" + e.getMessage() + "]"),
+                x -> Mono.error(new IllegalStateException("Transfer cancelled")));
 
-    private Consumer<Throwable> logTransferError(String sourceAccountNumber, String destinationAccountNumber, BigDecimal amount, TransactionLogService transactionLogService) {
-        return e -> transactionLogService.log(TransactionType.TRANSFER, ActivityStatus.FAILED,
-                transferRemarks(sourceAccountNumber, destinationAccountNumber, amount) + " - [" + e.getMessage() + "]");
+        return startLog.then(transferHandleError);
     }
 
     private Function<Account, Mono<? extends Account>> validateAccount(BigDecimal amount) {
